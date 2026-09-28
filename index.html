@@ -2493,13 +2493,43 @@ var qrcode = function() {
   // Если хотите зафиксировать адрес вручную, впишите его сюда, например 'https://ЛОГИН.github.io/landing/'
   var CANONICAL = '';
   var url = CANONICAL || (location.origin + location.pathname);
-  var qr = qrcode(0, 'M'); qr.addData(url); qr.make();
+  var qr = qrcode(0, 'Q'); qr.addData(url); qr.make();
   var n = qr.getModuleCount(), quiet = 4, scale = 12, size = (n + quiet*2) * scale;
 
   function draw(){
-    var c = document.createElement('canvas'); c.width = c.height = size;
-    var x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0,0,size,size); x.fillStyle = '#10314F';
-    for (var r=0;r<n;r++) for (var q=0;q<n;q++) if (qr.isDark(r,q)) x.fillRect((q+quiet)*scale,(r+quiet)*scale,scale,scale);
+    var m = 16, r = m/2, S = (n + quiet*2) * m;
+    size = S;
+    var c = document.createElement('canvas'); c.width = c.height = S;
+    var x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0,0,S,S);
+    var INK = '#10314F';
+    function eye(i,j){ return (i<7&&j<7)||(i<7&&j>=n-7)||(i>=n-7&&j<7); }
+    function D(i,j){ return i>=0&&j>=0&&i<n&&j<n&&!eye(i,j)&&qr.isDark(i,j); }
+    function rr(px,py,w,h,a,b,cc,d){ // радиусы: верх-лево, верх-право, низ-право, низ-лево
+      x.beginPath(); x.moveTo(px+a,py); x.lineTo(px+w-b,py); x.arcTo(px+w,py,px+w,py+b,b||.001);
+      x.lineTo(px+w,py+h-cc); x.arcTo(px+w,py+h,px+w-cc,py+h,cc||.001);
+      x.lineTo(px+d,py+h); x.arcTo(px,py+h,px,py+h-d,d||.001);
+      x.lineTo(px,py+a); x.arcTo(px,py,px+a,py,a||.001); x.closePath(); x.fill();
+    }
+    x.fillStyle = INK;
+    for (var i=0;i<n;i++) for (var j=0;j<n;j++) {
+      if (!D(i,j)) continue;
+      var px=(j+quiet)*m, py=(i+quiet)*m, up=D(i-1,j), dn=D(i+1,j), lf=D(i,j-1), rt=D(i,j+1), e=.6;
+      rr(px-(lf?e:0), py-(up?e:0), m+(lf?e:0)+(rt?e:0), m+(up?e:0)+(dn?e:0),
+         (!up&&!lf)?r:0, (!up&&!rt)?r:0, (!dn&&!rt)?r:0, (!dn&&!lf)?r:0);
+      [[-1,-1],[1,-1],[1,1],[-1,1]].forEach(function(s){ // скругление внутренних углов
+        var sx=s[0], sy=s[1];
+        if (D(i+sy,j) && D(i,j+sx) && !D(i+sy,j+sx)) {
+          var X=px+(sx>0?m:0), Y=py+(sy>0?m:0);
+          x.beginPath(); x.moveTo(X+sx*r,Y); x.quadraticCurveTo(X,Y,X,Y+sy*r); x.lineTo(X,Y); x.closePath(); x.fill();
+        }
+      });
+    }
+    [[0,0],[0,n-7],[n-7,0]].forEach(function(p){
+      var ex=(p[1]+quiet)*m, ey=(p[0]+quiet)*m;
+      x.fillStyle=INK; rr(ex,ey,7*m,7*m,2.2*m,2.2*m,2.2*m,2.2*m);
+      x.fillStyle='#fff'; rr(ex+m,ey+m,5*m,5*m,1.4*m,1.4*m,1.4*m,1.4*m);
+      x.fillStyle=INK; rr(ex+2*m,ey+2*m,3*m,3*m,.9*m,.9*m,.9*m,.9*m);
+    });
     return c;
   }
   var canvas = draw(), data = canvas.toDataURL('image/png');
